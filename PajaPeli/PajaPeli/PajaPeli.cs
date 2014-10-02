@@ -106,12 +106,12 @@ public class PajaPeli : TiedostoistaLadattavaPeli
         Keyboard.Listen(Key.Escape, ButtonState.Pressed, ConfirmExit, "Lopeta peli");
         Keyboard.Listen(Key.Left, ButtonState.Down, LiikutaPelaajaa, "Liikuta pelaajaa nuolinäppäimillä", -PELAAJAN_KAVELYNOPEUS);
         Keyboard.Listen(Key.Right, ButtonState.Down, LiikutaPelaajaa, null, PELAAJAN_KAVELYNOPEUS);
-        Keyboard.Listen(Key.Up, ButtonState.Down, HyppaytaPelaajaa, null, PELAAJAN_HYPPYKORKEUS);
+        Keyboard.Listen(Key.Up, ButtonState.Pressed, HyppaytaPelaajaa, null, PELAAJAN_HYPPYKORKEUS);
 
         ControllerOne.Listen(Button.Back, ButtonState.Pressed, ConfirmExit, "Lopeta peli");
         ControllerOne.Listen(Button.DPadLeft, ButtonState.Down, LiikutaPelaajaa, "Liikuta pelaajaa XBox-ohjaimen ristikkonäppäimellä", -PELAAJAN_KAVELYNOPEUS);
         ControllerOne.Listen(Button.DPadRight, ButtonState.Down, LiikutaPelaajaa, null, PELAAJAN_KAVELYNOPEUS);
-        ControllerOne.Listen(Button.A, ButtonState.Down, HyppaytaPelaajaa, "XBox-ohjaimen A-nappi on hyppynappi", PELAAJAN_HYPPYKORKEUS);
+        ControllerOne.Listen(Button.A, ButtonState.Pressed, HyppaytaPelaajaa, "XBox-ohjaimen A-nappi on hyppynappi", PELAAJAN_HYPPYKORKEUS);
 
         ShowControlHelp();
     }
