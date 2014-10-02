@@ -126,14 +126,8 @@ public class PajaPeli : TiedostoistaLadattavaPeli
         Pelaaja.IsVisible = true;
         Pelaaja.IgnoresCollisionResponse = false;
 
-        // Lisää maastoa esineiden ja hahmojen alle
-        foreach (GameObject esine in PelissaOlevatEsineet)
-        {
-            LisaaTaustaMaasto(esine);
-        }
         foreach (GameObject hahmo in PelissaOlevatHahmot)
         {
-            LisaaTaustaMaasto(hahmo);
             if (hahmo.Brain != null)
             {
                 hahmo.Brain.Active = true;
@@ -169,8 +163,8 @@ public class PajaPeli : TiedostoistaLadattavaPeli
         if (ValittuTausta != null)
         {
             Level.Background.Image = ValittuTausta;
-            Level.Background.ScaleToLevel();
-            Level.Background.TileToLevel();
+            Level.Background.FitToLevel();
+            //Level.Background.TileToLevel();
         }
     }
 
