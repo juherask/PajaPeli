@@ -13,6 +13,7 @@ using System.Reflection;
 static class Apuri
 {
     public static PajaPeli Peli = null;
+    static int VALINTOJA_PER_SIVU = 6;
 
     public static void VaihdaKokoruuduntilaan(IntPtr Hwnd, bool ylin)
     {
@@ -193,106 +194,12 @@ static class Apuri
     // Valikko"hässäkkä
     public static void NaytaAlkuValikko()
     {
-        MultiSelectWindow alkuValikko = new MultiSelectWindow("PajaPelin alkuvalikko",
-                "Aloita satunnainen peli", "Valitse pelisi", "Lopeta");
-        alkuValikko.AddItemHandler(0, Peli.SatunnainenPeliValittu);
-        alkuValikko.AddItemHandler(1, ValitsePelaajaHahmo);
-        alkuValikko.AddItemHandler(2, Peli.Exit);
-        alkuValikko.DefaultCancel = 2;
-        Peli.Add(alkuValikko);
-    }
+        // Nollaa valinnat
+        Peli.ValittuPelaajaHahmo = null;
+        Peli.ValittuKartta = null;
+        Peli.ValittuTausta = null;
+        Peli.ValittuMusiikki = null; 
 
-    public static void ValitsePelaajaHahmo()
-    {
-        List<string> hahmojenNimet = new List<string>();
-        Dictionary<string, Image> nimistaKuvat = new Dictionary<string, Image>();
-        foreach (var pelihahmo in Peli.HahmoKuvat[PajaPeli.PELAAJAN_ALOITUSPAIKAN_VARI])
-        {
-            hahmojenNimet.Add(Peli.Nimet[pelihahmo]);
-            nimistaKuvat.Add(Peli.Nimet[pelihahmo], pelihahmo);
-        }
-
-        if (hahmojenNimet.Count > 0)
-        {
-            MultiSelectWindow pelaajaValikko = new MultiSelectWindow("Valitse pelaajahahmo", hahmojenNimet.ToArray());
-            for (int i = 0; i < hahmojenNimet.Count; i++)
-            {
-                pelaajaValikko.AddItemHandler(i, PelihahmoValittu, i, hahmojenNimet);
-            }
-            Peli.Add(pelaajaValikko);
-            Timer.SingleShot(0.1, () => NaytaNappienKuvat(pelaajaValikko, nimistaKuvat));
-        }
-        else
-        {
-            ValitseKartta();
-        }
-    }
-
-    public static void NaytaNappienKuvat(MultiSelectWindow valikko, Dictionary<string, Image> nimistaKuvat)
-    {
-        foreach (PushButton valinta in valikko.Buttons)
-        {
-            valinta.TextColor = Color.Black;
-            valinta.Image = nimistaKuvat[valinta.Text];
-            valinta.ImageReleased = nimistaKuvat[valinta.Text];
-
-            // Tee valinnasta vaaleampi
-            Image valittuKuva = valinta.Image.Clone();
-            valittuKuva.ApplyPixelOperation( c => Color.Lighter(c, 100) );
-            valinta.ImageHover = valittuKuva;
-        }
-    }
-
-    public static void PelihahmoValittu(int valinta, List<string> hahmojenNimet)
-    {
-        var res = Peli.Nimet
-            .GroupBy(p => p.Value)
-            .ToDictionary(g => g.Key, g => g.Select(pp => pp.Key).ToList());
-        
-        string valitunHahmonNimi = hahmojenNimet[valinta];
-        Peli.ValittuPelaajaHahmo = res[valitunHahmonNimi].First();
-        ValitseKartta();
-    }
-
-    public static void ValitseKartta()
-    {
-        List<string> karttojenNimet = new List<string>();
-        Dictionary<string, Image> nimistaKuvat = new Dictionary<string, Image>();
-        foreach (var kartta in Peli.Kartat)
-        {
-            karttojenNimet.Add(Peli.Nimet[kartta]);
-            nimistaKuvat.Add(Peli.Nimet[kartta], kartta);
-        }
-
-        if (karttojenNimet.Count > 0)
-        {
-            MultiSelectWindow karttaValikko = new MultiSelectWindow("Valitse kartta", karttojenNimet.ToArray());
-            for (int i = 0; i < karttojenNimet.Count; i++)
-            {
-                karttaValikko.AddItemHandler(i, KarttaValittu, i, karttojenNimet);
-            }
-            Peli.Add(karttaValikko);
-            Timer.SingleShot(0.1, () => NaytaNappienKuvat(karttaValikko, nimistaKuvat));
-        }
-        else
-        {
-            ValitseTaustamusiikki();
-        }
-    }
-
-    public static void KarttaValittu(int valinta, List<string> karttojenNimet)
-    {
-        var res = Peli.Nimet
-           .GroupBy(p => p.Value)
-           .ToDictionary(g => g.Key, g => g.Select(pp => pp.Key).ToList());
-
-        string valitunKartanNimi = karttojenNimet[valinta];
-        Peli.ValittuKartta = res[valitunKartanNimi].First();
-        ValitseTaustakuva();
-    }
-
-    public static void ValitseTaustakuva()
-    {
         List<string> taustojenNimet = new List<string>();
         Dictionary<string, Image> nimistaKuvat = new Dictionary<string, Image>();
         foreach (var tausta in Peli.Taustakuvat)
@@ -301,23 +208,167 @@ static class Apuri
             nimistaKuvat.Add(Peli.Nimet[tausta], tausta);
         }
 
-        if (taustojenNimet.Count > 0)
+        MultiSelectWindow alkuValikko = new MultiSelectWindow("PajaPelin alkuvalikko",
+                "Aloita satunnainen peli", "Valitse pelisi", "Lopeta");
+        alkuValikko.AddItemHandler(0, Peli.SatunnainenPeliValittu);
+        alkuValikko.AddItemHandler(1,
+            () => ValitseValintaValikosta(
+                 "Valitse pelaajahahmo", /*kuvaus*/
+                 Peli.HahmoKuvat[PajaPeli.PELAAJAN_ALOITUSPAIKAN_VARI].ToList<object>(), /*vaihtoehdot*/
+                 0, -1, /*mistä mihin, yritä alusta loppuun*/
+                 PelihahmoValittu,
+
+                 () => ValitseValintaValikosta(
+                     "Valitse kenttä", /*kuvaus*/
+                     Peli.Kartat.ToList<object>(), /*vaihtoehdot*/
+                     0, -1, /*mistä mihin, yritä alusta loppuun*/
+                     KarttaValittu,
+
+                     () => ValitseValintaValikosta(
+                         "Valitse taustakuva", /*kuvaus*/
+                         taustojenNimet.ToList<object>(), /*vaihtoehdot*/
+                         0, -1, /*mistä mihin, yritä alusta loppuun*/
+                         TaustaValittu,
+                         ValitseTaustamusiikki))));
+                
+        alkuValikko.AddItemHandler(2, Peli.Exit);
+        alkuValikko.DefaultCancel = 2;
+        Peli.Add(alkuValikko);
+    }
+
+    private static void ValitseValintaValikosta(
+        string valintaTeksti,
+        List<object> vaihtoehdot,
+        int mista, int mihin,
+        Action<int, List<string>, Action> toiminto,
+        Action seuraavaValinta)
+    {
+        if (mista < 0 || mista > vaihtoehdot.Count - 1)
         {
-            MultiSelectWindow taustaValikko = new MultiSelectWindow("Valitse taustakuva", taustojenNimet.ToArray());
-            for (int i = 0; i < taustojenNimet.Count; i++)
+            mista = 0;
+        }
+        if (mihin < 0 || mihin > vaihtoehdot.Count)
+        {
+            mihin = vaihtoehdot.Count;
+        }
+        if (mista + VALINTOJA_PER_SIVU > mihin || mihin - mista > VALINTOJA_PER_SIVU)
+        {
+            mihin = Math.Min(vaihtoehdot.Count, mista + VALINTOJA_PER_SIVU);
+        }
+
+        List<string> valintojenNimet = new List<string>();
+        Dictionary<string, Image> nimistaKuvat = new Dictionary<string, Image>();
+
+        // TODO: Pitäisi selvittää (bool?) että tarvitaanko näitä nappeja. 
+        //   Lisää testausta sen jälkeen. JA PALJON!
+        if (vaihtoehdot.Count > VALINTOJA_PER_SIVU && mista > 0)
+        {
+            valintojenNimet.Add("Edellinen sivu");
+        }
+        for (int i = mista; i < mihin; i++)
+		{
+            if (vaihtoehdot[i] is Image)
             {
-                taustaValikko.AddItemHandler(i, TaustaValittu, i, taustojenNimet);
+                Image vaihtoehto = vaihtoehdot[i] as Image;
+                valintojenNimet.Add(Peli.Nimet[vaihtoehto]);
+                nimistaKuvat.Add(Peli.Nimet[vaihtoehto], vaihtoehto);
             }
-            Peli.Add(taustaValikko);
-            //Timer.SingleShot(0.1, () => NaytaNappienKuvat(taustaValikko, nimistaKuvat));
+            else if (vaihtoehdot[i] is string)
+            {
+                string vaihtoehto = vaihtoehdot[i] as string;
+                valintojenNimet.Add(vaihtoehto);
+            }
+        }
+        if (vaihtoehdot.Count > VALINTOJA_PER_SIVU && mihin < vaihtoehdot.Count)
+        {
+            valintojenNimet.Add("Seuraava sivu");
+        }
+
+        if (valintojenNimet.Count > 0)
+        {
+            MultiSelectWindow valintaValikko = new MultiSelectWindow(valintaTeksti, valintojenNimet.ToArray());
+            for (int i = 0; i < valintojenNimet.Count; i++)
+            {
+                if (vaihtoehdot.Count > VALINTOJA_PER_SIVU && i == 0 && mista > 0)
+                {
+                    valintaValikko.AddItemHandler(i, () =>
+                        ValitseValintaValikosta(
+                            valintaTeksti,
+                            vaihtoehdot,
+                            mista - VALINTOJA_PER_SIVU, mista,
+                            toiminto,
+                            seuraavaValinta));
+                }
+                else if (vaihtoehdot.Count > VALINTOJA_PER_SIVU && i == valintojenNimet.Count - 1 && mihin < vaihtoehdot.Count)
+                {
+                    valintaValikko.AddItemHandler(i, () =>
+                        ValitseValintaValikosta(
+                            valintaTeksti,
+                            vaihtoehdot,
+                            mihin, mihin + VALINTOJA_PER_SIVU,
+                            toiminto,
+                            seuraavaValinta));
+                }
+                else
+                {
+                    valintaValikko.AddItemHandler(i, toiminto, i, valintojenNimet, seuraavaValinta);
+                }
+            }
+            Peli.Add(valintaValikko);
+            Timer.SingleShot(0.1, () => NaytaNappienKuvat(valintaValikko, nimistaKuvat));
         }
         else
         {
-            ValitseTaustamusiikki();
+            if (seuraavaValinta!=null)
+                seuraavaValinta();
         }
     }
 
-    public static void TaustaValittu(int valinta, List<string> taustojenNimet)
+    public static void NaytaNappienKuvat(MultiSelectWindow valikko, Dictionary<string, Image> nimistaKuvat)
+    {
+        foreach (PushButton valinta in valikko.Buttons)
+        {
+            if (nimistaKuvat.ContainsKey(valinta.Text))
+            {
+                valinta.TextColor = Color.Black;
+                valinta.Image = nimistaKuvat[valinta.Text];
+                valinta.ImageReleased = nimistaKuvat[valinta.Text];
+
+                // Tee valinnasta vaaleampi
+                Image valittuKuva = valinta.Image.Clone();
+                valittuKuva.ApplyPixelOperation( c => Color.Lighter(c, 100) );
+                valinta.ImageHover = valittuKuva;
+            }
+        }
+    }
+
+    public static void PelihahmoValittu(int valinta, List<string> hahmojenNimet, Action seuraavaValinta)
+    {
+        var res = Peli.Nimet
+            .GroupBy(p => p.Value)
+            .ToDictionary(g => g.Key, g => g.Select(pp => pp.Key).ToList());
+        
+        string valitunHahmonNimi = hahmojenNimet[valinta];
+        Peli.ValittuPelaajaHahmo = res[valitunHahmonNimi].First();
+
+        if (seuraavaValinta!=null)
+            seuraavaValinta();
+    }
+
+    public static void KarttaValittu(int valinta, List<string> karttojenNimet, Action seuraavaValinta)
+    {
+        var res = Peli.Nimet
+           .GroupBy(p => p.Value)
+           .ToDictionary(g => g.Key, g => g.Select(pp => pp.Key).ToList());
+
+        string valitunKartanNimi = karttojenNimet[valinta];
+        Peli.ValittuKartta = res[valitunKartanNimi].First();
+
+        if (seuraavaValinta != null)
+            seuraavaValinta();
+    }
+
+    public static void TaustaValittu(int valinta, List<string> taustojenNimet, Action seuraavaValinta)
     {
         var res = Peli.Nimet
            .GroupBy(p => p.Value)
@@ -325,7 +376,8 @@ static class Apuri
 
         string valitunTaustanNimi = taustojenNimet[valinta];
         Peli.ValittuTausta = res[valitunTaustanNimi].First();
-        ValitseTaustamusiikki();
+        if (seuraavaValinta != null)
+            seuraavaValinta();
     }
 
     public static void ValitseTaustamusiikki()

@@ -4,26 +4,8 @@ using Jypeli;
 using Jypeli.Assets;
 using Jypeli.Controls;
 using Jypeli.Effects;
-using Jypeli.Widgets;
 using System.IO;
-
-/*
- * TODO / BUGIT
- * 
- * TODO: Testaa toimiiko dynaaminen lataaminen
- *          - hahmoille,
- *          - esineille ja
- *          - maastolle.
- *          - äänille 
- * TODO: Testaa erityisesti liikkumisen ääni.
- * TODO: Jos valittavaa on liikaa, valikkoon ei mahdu!
- * TODO: Tee esineistä kerättäviä ja niille inventaario.
- * TODO: Valikot,
- *          - alkuvalikko, josta valitaan "Satunnainen peli", "Valikoitu peli" (ks alla.), "Lopeta".
- *          - "Valikoitu peli"-valikko, joilla voi (alivalikoista) valita kentän, pelihahmon ja taustamusiikin.
- *             Tee myös pikanäppäimet, joilla pelin aikana voi vaihtaa näitä.
- *             
- */
+using Jypeli.Widgets;
 
 public class PajaPeli : TiedostoistaLadattavaPeli
 {
@@ -32,15 +14,8 @@ public class PajaPeli : TiedostoistaLadattavaPeli
     static double PELAAJAN_KAVELYNOPEUS = 1000;
     static double PELAAJAN_HYPPYKORKEUS = 2000;
     static double PELAAJAN_LIUKUMISVAKIO = 0.1;
-    static int ESTE_TUMMA_VARI_RAJAARVO = 200;
-    public static Color PELAAJAN_ALOITUSPAIKAN_VARI = Color.FromPaintDotNet(0, 14);
-    public static Color KENTÄN_MAALIN_VARI = Color.FromPaintDotNet(1, 14);
 
-    // Peliin valitut asiat
-    public Image ValittuPelaajaHahmo;
-    public Image ValittuKartta;
-    public Image ValittuTausta;
-    public SoundEffect ValittuMusiikki; 
+    public static int ESTE_TUMMA_VARI_RAJAARVO = 200;
 
     // Pelin tilanne ja tilatietoa tallentavat muuttujat
     List<Vector> PelaajanAloitusPaikat = new List<Vector>();
@@ -54,55 +29,13 @@ public class PajaPeli : TiedostoistaLadattavaPeli
         LataaSisallotTiedostoista();
 
         Mouse.IsCursorVisible = true;
-        
-        // Nollaa valinnat
-        ValittuPelaajaHahmo = null;
-        ValittuKartta = null;
-        ValittuTausta = null;
-        ValittuMusiikki = null; 
-
         Apuri.NaytaAlkuValikko();
-    }
-
-    /// <summary>
-    /// Tätä kutsutaan kun pelaaja valitsee alkuvalikosta pelattavaksi satunnaisen pelin.
-    /// </summary>
-    public void SatunnainenPeliValittu()
-    {
-        // kuva,   
-        ValittuPelaajaHahmo = null;
-        if (HahmoKuvat.ContainsKey(PELAAJAN_ALOITUSPAIKAN_VARI))
-        {
-            ValittuPelaajaHahmo = RandomGen.SelectOne<Image>(HahmoKuvat[PELAAJAN_ALOITUSPAIKAN_VARI]);
-        }
-        LisaaPelaajaPeliin();
-
-        ValittuKartta = RandomGen.SelectOne<Image>(Kartat);
-        ValittuTausta = RandomGen.SelectOne<Image>(Taustakuvat);
-        LataaKentta();
-
-        // äänet, 
-        SoitaSatunnainenTaustaMusiikki();
-     
-        // käy!
-        Timer.SingleShot(0.1, KaynnistaPeli);
-    }
-
-    public void TiettyPeliValittu()
-    {
-        LisaaPelaajaPeliin();
-        LataaKentta();
-        if (ValittuMusiikki != null)
-        {
-            Sound biisi = ValittuMusiikki.CreateSound();
-            biisi.IsLooped = true;
-            biisi.Play();
-        }
-        Timer.SingleShot(0.1, KaynnistaPeli);
     }
 
     void LisaaNappainKuuntelijat()
     {
+        Mouse.IsCursorVisible = false;
+
         Keyboard.Listen(Key.Escape, ButtonState.Pressed, ConfirmExit, "Lopeta peli");
         Keyboard.Listen(Key.Left, ButtonState.Down, LiikutaPelaajaa, "Liikuta pelaajaa nuolinäppäimillä", -PELAAJAN_KAVELYNOPEUS);
         Keyboard.Listen(Key.Right, ButtonState.Down, LiikutaPelaajaa, null, PELAAJAN_KAVELYNOPEUS);
@@ -116,7 +49,8 @@ public class PajaPeli : TiedostoistaLadattavaPeli
         ShowControlHelp();
     }
 
-    void KaynnistaPeli()
+    // Tätä kutsutaan kun valinnat on tehty ja peli toden teolla käynnistyy.
+    public override void KaynnistaPeli()
     {
         LisaaNappainKuuntelijat();
 
@@ -126,6 +60,7 @@ public class PajaPeli : TiedostoistaLadattavaPeli
         Pelaaja.IsVisible = true;
         Pelaaja.IgnoresCollisionResponse = false;
 
+        // Aktivoi viholliset
         foreach (GameObject hahmo in PelissaOlevatHahmot)
         {
             if (hahmo.Brain != null)
@@ -133,41 +68,10 @@ public class PajaPeli : TiedostoistaLadattavaPeli
                 hahmo.Brain.Active = true;
             }
         }
-        Mouse.IsCursorVisible = false;
+
+        // ja painovoima
         Gravity = new Vector(0, -3000);
     }
-    
-    void LataaKentta()
-    {
-        //1. Luetaan kuva uuteen ColorTileMappiin, kuvan nimen perässä ei .png-päätettä.
-        ColorTileMap ruudut = new ColorTileMap( ValittuKartta );
-  
-        //2. Kerrotaan mitä aliohjelmaa kutsutaan, kun tietyn värinen pikseli tulee vastaan kuvatiedostossa.
-        HashSet<Color> varatutVarit = new HashSet<Color>();
-        Apuri.LisaaKasittelijatVareille(new List<Color>() {KENTÄN_MAALIN_VARI}, ruudut, LisaaMaaliKartalle, ref varatutVarit);
-        Apuri.LisaaKasittelijatVareille(new List<Color>(MaastoKuvat.Keys), ruudut, LisaaMaastoaKartalle, ref varatutVarit);
-        Apuri.LisaaKasittelijatVareille(new List<Color>(HahmoKuvat.Keys), ruudut, LisaaHahmoKartalle, ref varatutVarit);
-        Apuri.LisaaKasittelijatVareille(new List<Color>(EsineKuvat.Keys), ruudut, LisaaEsineKartalle, ref varatutVarit);
-        // Loput värit tulkitaan maastoksi
-        Apuri.LisaaKasittelijatVareille(Apuri.AnnaKaikkiKuvanVarit(ValittuKartta), ruudut, LisaaMaastoaKartalle, ref varatutVarit);
-        
-        //3. Execute luo kentän
-        //   Parametreina leveys ja korkeus
-        ruudut.Execute(RUUDUN_LEVEYS+1, RUUDUN_KORKEUS+1);
-
-        // Pelaaja aloittaa keskeltä, jos ei ole merkattuja aloituspaikkoja
-        if (PelaajanAloitusPaikat.Count == 0)
-            PelaajanAloitusPaikat.Add(new Vector(0, 0));
-
-        // Aseta taustakuva
-        if (ValittuTausta != null)
-        {
-            Level.Background.Image = ValittuTausta;
-            Level.Background.FitToLevel();
-            //Level.Background.TileToLevel();
-        }
-    }
-
 
     #region PeliTapahtumienKäsittely
     void PelaajaKeraaEsineen(PhysicsObject pelaaja, PhysicsObject esine)
@@ -227,7 +131,38 @@ public class PajaPeli : TiedostoistaLadattavaPeli
     }
     #endregion
 
-#region PeliOlioidenLisääminen
+    #region PeliOlioidenLisääminen
+    public override void LataaKentta()
+    {
+        //1. Luetaan kuva uuteen ColorTileMappiin, kuvan nimen perässä ei .png-päätettä.
+        ColorTileMap ruudut = new ColorTileMap(ValittuKartta);
+
+        //2. Kerrotaan mitä aliohjelmaa kutsutaan, kun tietyn värinen pikseli tulee vastaan kuvatiedostossa.
+        HashSet<Color> varatutVarit = new HashSet<Color>();
+        Apuri.LisaaKasittelijatVareille(new List<Color>() { KENTÄN_MAALIN_VARI }, ruudut, LisaaMaaliKartalle, ref varatutVarit);
+        Apuri.LisaaKasittelijatVareille(new List<Color>(MaastoKuvat.Keys), ruudut, LisaaMaastoaKartalle, ref varatutVarit);
+        Apuri.LisaaKasittelijatVareille(new List<Color>(HahmoKuvat.Keys), ruudut, LisaaHahmoKartalle, ref varatutVarit);
+        Apuri.LisaaKasittelijatVareille(new List<Color>(EsineKuvat.Keys), ruudut, LisaaEsineKartalle, ref varatutVarit);
+        // Loput värit tulkitaan maastoksi
+        Apuri.LisaaKasittelijatVareille(Apuri.AnnaKaikkiKuvanVarit(ValittuKartta), ruudut, LisaaMaastoaKartalle, ref varatutVarit);
+
+        //3. Execute luo kentän
+        //   Parametreina leveys ja korkeus
+        ruudut.Execute(RUUDUN_LEVEYS + 1, RUUDUN_KORKEUS + 1);
+
+        // Pelaaja aloittaa keskeltä, jos ei ole merkattuja aloituspaikkoja
+        if (PelaajanAloitusPaikat.Count == 0)
+            PelaajanAloitusPaikat.Add(new Vector(0, 0));
+
+        // Aseta taustakuva
+        if (ValittuTausta != null)
+        {
+            Level.Background.Image = ValittuTausta;
+            Level.Background.FitToLevel();
+            //Level.Background.TileToLevel();
+        }
+    }
+
     void LisaaMaaliKartalle(Vector paikka, double leveys, double korkeus, Color vari)
     {
         PhysicsObject maali = PhysicsObject.CreateStaticObject(leveys, korkeus);
@@ -322,7 +257,7 @@ public class PajaPeli : TiedostoistaLadattavaPeli
         PelissaOlevatEsineet.Add(esine);
         AddCollisionHandler(Pelaaja, esine, PelaajaKeraaEsineen);
     }
-    void LisaaPelaajaPeliin()
+    public override void LisaaPelaajaPeliin()
     {
         Pelaaja = new PlatformCharacter(RUUDUN_LEVEYS - 2, RUUDUN_KORKEUS - 2);
         Pelaaja.LinearDamping = 1-PELAAJAN_LIUKUMISVAKIO;
@@ -342,27 +277,6 @@ public class PajaPeli : TiedostoistaLadattavaPeli
             Pelaaja.Color = PELAAJAN_ALOITUSPAIKAN_VARI;
         }
         Camera.Follow(Pelaaja);
-    }
-    void LisaaTaustaMaasto(GameObject esineTaiHahmo)
-    {
-        GameObject maasto = null;
-        foreach (GameObject lahin in GetObjectsAt(esineTaiHahmo.Position, esineTaiHahmo.Width * 1.5))
-        {
-            // On esine itse tai este (tai hahmo)
-            if (lahin == esineTaiHahmo || lahin is PhysicsObject)
-                continue;
-            maasto = lahin;
-            break; // Lopettaa etsinnän
-        }
-        if (maasto != null)
-        {
-            GameObject uusiMaasto = new GameObject(maasto.Width, maasto.Height);
-            uusiMaasto.Color = maasto.Color;
-            uusiMaasto.Image = maasto.Image;
-            uusiMaasto.Tag = maasto.Tag;
-            uusiMaasto.Position = esineTaiHahmo.Position;
-            Add(uusiMaasto);
-        }
     }
 #endregion
 }

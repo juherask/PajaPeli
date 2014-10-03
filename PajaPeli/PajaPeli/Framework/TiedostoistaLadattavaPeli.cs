@@ -11,7 +11,7 @@ using System.IO;
 
 
 
-public class TiedostoistaLadattavaPeli : PhysicsGame
+abstract public class TiedostoistaLadattavaPeli : PhysicsGame
 {
     public enum Tapahtuma
     {
@@ -36,6 +36,9 @@ public class TiedostoistaLadattavaPeli : PhysicsGame
     protected static int TAUSTAN_MAKSIMILEVEYS = 1920;
     protected static int TAUSTAN_MAKSIMIKORKEUS = 1080;
 
+    public static Color PELAAJAN_ALOITUSPAIKAN_VARI = Color.FromPaintDotNet(0, 14);
+    public static Color KENTÄN_MAALIN_VARI = Color.FromPaintDotNet(1, 14);
+
     // Nämä pitävät sisällään peliin tiedostoista ladattavaa sisältöä.
     //  Dictionary tarkoittaa hakemistoa, jossa kuhunkin arvoon (esim. väri Color) on 
     //  linkitetty esim. lista kuvia (Image).
@@ -48,9 +51,19 @@ public class TiedostoistaLadattavaPeli : PhysicsGame
     public List<Image> Kartat;
     public List<Image> Taustakuvat;
 
+    // Peliin valitut asiat
+    public Image ValittuPelaajaHahmo;
+    public Image ValittuKartta;
+    public Image ValittuTausta;
+    public SoundEffect ValittuMusiikki; 
 
     // Liikkumisesta kuuluva ääni
     SoundEffect liikkumisTehoste = null;
+
+    // Nämä toteutetaan itse pelissä
+    abstract public void KaynnistaPeli();
+    abstract public void LisaaPelaajaPeliin();
+    abstract public void LataaKentta();
 
     protected void LataaSisallotTiedostoista()
     {
@@ -67,6 +80,44 @@ public class TiedostoistaLadattavaPeli : PhysicsGame
         Apuri.LataaAanetKansiosta(@"DynamicContent\Tehosteet", out Tehosteet);
         Apuri.LataaAanetKansiosta(@"DynamicContent\Musiikki", out Musiikki);
     }
+
+    /// <summary>
+    /// Tätä kutsutaan kun pelaaja valitsee alkuvalikosta pelattavaksi satunnaisen pelin.
+    /// </summary>
+    public void SatunnainenPeliValittu()
+    {
+        // kuva,   
+        ValittuPelaajaHahmo = null;
+        if (HahmoKuvat.ContainsKey(PELAAJAN_ALOITUSPAIKAN_VARI))
+        {
+            ValittuPelaajaHahmo = RandomGen.SelectOne<Image>(HahmoKuvat[PELAAJAN_ALOITUSPAIKAN_VARI]);
+        }
+        LisaaPelaajaPeliin();
+
+        ValittuKartta = RandomGen.SelectOne<Image>(Kartat);
+        ValittuTausta = RandomGen.SelectOne<Image>(Taustakuvat);
+        LataaKentta();
+
+        // äänet, 
+        SoitaSatunnainenTaustaMusiikki();
+
+        // käy!
+        Timer.SingleShot(0.1, KaynnistaPeli);
+    }
+
+    public void TiettyPeliValittu()
+    {
+        LisaaPelaajaPeliin();
+        LataaKentta();
+        if (ValittuMusiikki != null)
+        {
+            Sound biisi = ValittuMusiikki.CreateSound();
+            biisi.IsLooped = true;
+            biisi.Play();
+        }
+        Timer.SingleShot(0.1, KaynnistaPeli);
+    }
+
 
     #region ÄäntenSoitto
     protected void ToistaTehoste(Tapahtuma tapahtuma)
